@@ -3,7 +3,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
@@ -21,15 +21,10 @@ if ($method === 'GET') {
     $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode($books);
     exit;
+
 } elseif ($method === 'POST') {
     $inputRaw = file_get_contents('php://input');
     $input = json_decode($inputRaw, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Invalid JSON', 'details' => json_last_error_msg()]);
-        exit;
-    }
 
     if (empty($input['title']) || empty($input['author'])) {
         http_response_code(400);
@@ -45,13 +40,32 @@ if ($method === 'GET') {
         $input['published_year'] ?? date('Y')
     ]);
 
-    echo json_encode([
-        'message' => 'Book added successfully',
-        'id' => $pdo->lastInsertId()
-    ]);
+    echo json_encode(['message' => 'Book added successfully', 'id' => $pdo->lastInsertId()]);
+    exit;
+
+} elseif ($method === 'DELETE') {
+    // Get the ID from URL (e.g., /api.php?id=5)
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid book ID']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("DELETE FROM books WHERE id = ?");
+    $success = $stmt->execute([$id]);
+
+    if ($success) {
+        echo json_encode(['message' => 'Book deleted successfully']);
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to delete book']);
+    }
     exit;
 }
 
 http_response_code(405);
 echo json_encode(['error' => 'Method not allowed']);
 exit;
+?>
